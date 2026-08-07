@@ -90,22 +90,6 @@ find_libfile() {
     return 1
 }
 
-# Debian系（trixie以降）は libjpeg.so.8 を提供しない（libjpeg62-turbo は libjpeg.so.62 のみ）。
-# AzPainter のバイナリは libjpeg.so.8 にリンクされているため、
-# libjpeg62-turbo のライブラリから互換シンボリックリンクを作成して補完する。
-ensure_libjpeg8() {
-    if [ -n "$(find_libfile libjpeg.so.8)" ]; then
-        return 0
-    fi
-    local lib62 dir
-    lib62="$(find_libfile libjpeg.so.62)"
-    [ -n "${lib62}" ] || return 0
-    dir="$(dirname "${lib62}")"
-    echo "libjpeg.so.8 が見つからないため、libjpeg62-turbo から互換リンクを作成します。"
-    ln -sf "${lib62}" "${dir}/libjpeg.so.8"
-    ldconfig
-}
-
 check_missing() {
     # readelf で NEEDED ライブラリを機械的に取得し、ファイルの実在を確認する
     # （ldd の出力形式や ldconfig キャッシュの状態に依存しない）。
@@ -132,8 +116,6 @@ check_missing() {
     return 0
 }
 
-ensure_libjpeg8
-
 MISSING="$(check_missing)"
 if [ -n "${MISSING}" ]; then
     echo "不足しているライブラリ: ${MISSING}"
@@ -143,7 +125,7 @@ if [ -n "${MISSING}" ]; then
             libpng16.so.16)      PKGS="${PKGS} libpng16-16" ;;
             libtiff.so.6)        PKGS="${PKGS} libtiff6" ;;
             libtiff.so.5)        PKGS="${PKGS} libtiff5" ;;
-            libjpeg.so.8)        PKGS="${PKGS} libjpeg62-turbo" ;;
+            libjpeg.so.62)       PKGS="${PKGS} libjpeg62-turbo" ;;
             libwebp.so.7)        PKGS="${PKGS} libwebp7" ;;
             libwebpdemux.so.2)   PKGS="${PKGS} libwebpdemux2" ;;
             libheif.so.1)        PKGS="${PKGS} libheif1" ;;
@@ -173,7 +155,6 @@ if [ -n "${MISSING}" ]; then
         apt-get install -y ${PKGS}
     fi
 
-    ensure_libjpeg8
     MISSING="$(check_missing)"
     if [ -n "${MISSING}" ]; then
         echo
