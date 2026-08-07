@@ -67,6 +67,26 @@ sudo ./make-release.sh
 **latest release** としてアップロードしてください（タグは `azpainter-<version>` を推奨）。
 インストールスクリプトは latest release のアセットを参照します。
 
+## トラブルシューティング
+
+### `libjpeg.so.8: cannot open shared object file`
+
+Debian系（trixie以降）は `libjpeg.so.8` を提供しないため、標準環境でこのエラーが発生します。
+`install-azpainter.sh` が実行時に `libjpeg62-turbo` の `libjpeg.so.62` から互換リンクを
+自動作成して解決します。
+
+手動で直す場合は以下を実行してください。
+
+```sh
+sudo apt install libjpeg62-turbo
+sudo ln -s /usr/lib/x86_64-linux-gnu/libjpeg.so.62 /usr/lib/x86_64-linux-gnu/libjpeg.so.8
+sudo ldconfig
+```
+
+> 注意: ビルド機に MX リポジトリの `libjpeg-turbo8` が入っていると、バイナリが
+> `libjpeg.so.8` にリンクされます。互換リンクによる解決は AzPainter が使う
+> libjpeg の基本 API では問題ありません。
+
 ## ライセンス
 
 このリポジトリ内のインストールスクリプトおよびパッケージは、

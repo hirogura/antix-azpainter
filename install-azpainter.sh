@@ -65,11 +65,34 @@ if [ -f "${TMP_DIR}/manifest" ]; then
     chmod 644 "${MANIFEST}"
 fi
 
-# --- 依存ライブラリの確認 ---
+# --- 依存ライブラリの確認・修復 ---
 echo "[4/4] 依存ライブラリを確認しています..."
-MISSING="$(ldd /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
-    | grep 'not found' | awk '{print $1}' | sort -u)"
 
+# Debian系（trixie以降）は libjpeg.so.8 を提供しない（libjpeg62-turbo は libjpeg.so.62 のみ）。
+# AzPainter のバイナリは libjpeg.so.8 にリンクされているため、
+# libjpeg62-turbo のライブラリから互換シンボリックリンクを作成して補完する。
+ensure_libjpeg8() {
+    if ldconfig -p 2>/dev/null | awk '{print $1}' | grep -qx 'libjpeg.so.8'; then
+        return 0
+    fi
+    local lib62 dir
+    lib62="$(ldconfig -p 2>/dev/null | awk '$1 == "libjpeg.so.62" {print $NF; exit}')"
+    [ -n "${lib62}" ] || return 0
+    dir="$(dirname "${lib62}")"
+    [ -d "${dir}" ] || return 0
+    echo "libjpeg.so.8 が見つからないため、libjpeg62-turbo から互換リンクを作成します。"
+    ln -sf "${lib62}" "${dir}/libjpeg.so.8"
+    ldconfig
+}
+
+check_missing() {
+    ldd /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
+        | grep 'not found' | awk '{print $1}' | sort -u
+}
+
+ensure_libjpeg8
+
+MISSING="$(check_missing)"
 if [ -n "${MISSING}" ]; then
     echo "不足しているライブラリ: ${MISSING}"
     PKGS=""
@@ -104,6 +127,17 @@ if [ -n "${MISSING}" ]; then
         apt-get update
         # shellcheck disable=SC2086
         apt-get install -y ${PKGS}
+    fi
+
+    ensure_libjpeg8
+    MISSING="$(check_missing)"
+    if [ -n "${MISSING}" ]; then
+        echo
+        echo "エラー: 以下のライブラリが不足しています: ${MISSING}"
+        echo "対応パッケージが不明またはインストールに失敗しています。"
+        echo "パッケージの状態を確認してください:"
+        echo "  apt-file search ${MISSING}"
+        exit 1
     fi
 fi
 
