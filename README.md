@@ -5,6 +5,8 @@ antiX 向け [AzPainter](https://gitlab.com/azelpg/azpainter) のビルド済み
 AzPainter は Debian 公式リポジトリに存在しないため、これまでソースからビルドする必要がありました。
 このリポジトリでは、ビルド済みのバイナリを GitHub Releases からダウンロードしてインストールできます。
 
+![ロゴ画像](azpainter.png)
+
 ## ファイル構成
 
 | ファイル | 説明 |
