@@ -68,42 +68,68 @@ fi
 # --- 依存ライブラリの確認・修復 ---
 echo "[4/4] 依存ライブラリを確認しています..."
 
+# 標準ライブラリディレクトリの判定
+MULTIARCH=""
+case "$(uname -m)" in
+    x86_64)  MULTIARCH="x86_64-linux-gnu" ;;
+    aarch64) MULTIARCH="aarch64-linux-gnu" ;;
+    i386|i486|i586|i686) MULTIARCH="i386-linux-gnu" ;;
+esac
+DPKG_MA="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || true)"
+[ -n "${DPKG_MA}" ] && MULTIARCH="${DPKG_MA}"
+
+# 標準ディレクトリからライブラリファイルの実在を確認する
+find_libfile() {
+    local lib="$1" d
+    for d in /usr/local/lib /usr/lib/${MULTIARCH} /lib/${MULTIARCH} /usr/lib /lib; do
+        if [ -e "${d}/${lib}" ]; then
+            echo "${d}/${lib}"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Debian系（trixie以降）は libjpeg.so.8 を提供しない（libjpeg62-turbo は libjpeg.so.62 のみ）。
 # AzPainter のバイナリは libjpeg.so.8 にリンクされているため、
 # libjpeg62-turbo のライブラリから互換シンボリックリンクを作成して補完する。
 ensure_libjpeg8() {
-    if ldconfig -p 2>/dev/null | awk '{print $1}' | grep -qx 'libjpeg.so.8'; then
+    if [ -n "$(find_libfile libjpeg.so.8)" ]; then
         return 0
     fi
     local lib62 dir
-    lib62="$(ldconfig -p 2>/dev/null | awk '$1 == "libjpeg.so.62" {print $NF; exit}')"
+    lib62="$(find_libfile libjpeg.so.62)"
     [ -n "${lib62}" ] || return 0
     dir="$(dirname "${lib62}")"
-    [ -d "${dir}" ] || return 0
     echo "libjpeg.so.8 が見つからないため、libjpeg62-turbo から互換リンクを作成します。"
     ln -sf "${lib62}" "${dir}/libjpeg.so.8"
     ldconfig
 }
 
 check_missing() {
-    # readelf で NEEDED ライブラリを機械的に取得し、ldconfig のキャッシュに
-    # 存在するかを確認する（ldd の出力形式に依存しないため安定）。
-    if command -v readelf >/dev/null 2>&1; then
-        local missing="" lib
-        for lib in $(readelf -d /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
-            | awk '/NEEDED/{print $NF}' | tr -d '[]' | sort -u); do
-            if ! ldconfig -p 2>/dev/null | awk '{print $1}' | grep -qx "${lib}"; then
-                missing="${missing} ${lib}"
-            fi
-        done
-        echo "${missing}" | sed 's/^ //'
+    # readelf で NEEDED ライブラリを機械的に取得し、ファイルの実在を確認する
+    # （ldd の出力形式や ldconfig キャッシュの状態に依存しない）。
+    if ! command -v readelf >/dev/null 2>&1; then
+        # フォールバック: ldd の "lib => not found" 行のみを対象にする
+        ldd /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
+            | awk '$2 == "=>" && $3 == "not" && $4 == "found" {print $1}' \
+            | sort -u \
+            || true
         return 0
     fi
-    # フォールバック: ldd の "lib => not found" 行のみを対象にする
-    ldd /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
-        | awk '$2 == "=>" && $3 == "not" && $4 == "found" {print $1}' \
-        | sort -u \
-        || true
+    local missing="" lib
+    for lib in $(readelf -d /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
+        | awk '/NEEDED/{print $NF}' | tr -d '[]' | sort -u); do
+        if [ -n "$(find_libfile "${lib}")" ]; then
+            continue
+        fi
+        if ldconfig -p 2>/dev/null | awk '{print $1}' | grep -qx "${lib}"; then
+            continue
+        fi
+        missing="${missing} ${lib}"
+    done
+    echo "${missing}" | sed 's/^ //'
+    return 0
 }
 
 ensure_libjpeg8
@@ -135,6 +161,8 @@ if [ -n "${MISSING}" ]; then
             libEGL.so.1)         PKGS="${PKGS} libegl1" ;;
             libGL.so.1)          PKGS="${PKGS} libgl1" ;;
             libz.so.1)           PKGS="${PKGS} zlib1g" ;;
+            libc.so.6|libm.so.6) PKGS="${PKGS} libc6" ;;
+            libmlk.so.1)         : ;;
             *) echo "警告: ${lib} に対応するパッケージ名が不明です。" ;;
         esac
     done
