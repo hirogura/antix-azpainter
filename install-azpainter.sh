@@ -86,9 +86,22 @@ ensure_libjpeg8() {
 }
 
 check_missing() {
+    # readelf で NEEDED ライブラリを機械的に取得し、ldconfig のキャッシュに
+    # 存在するかを確認する（ldd の出力形式に依存しないため安定）。
+    if command -v readelf >/dev/null 2>&1; then
+        local missing="" lib
+        for lib in $(readelf -d /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
+            | awk '/NEEDED/{print $NF}' | tr -d '[]' | sort -u); do
+            if ! ldconfig -p 2>/dev/null | awk '{print $1}' | grep -qx "${lib}"; then
+                missing="${missing} ${lib}"
+            fi
+        done
+        echo "${missing}" | sed 's/^ //'
+        return 0
+    fi
+    # フォールバック: ldd の "lib => not found" 行のみを対象にする
     ldd /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
-        | grep 'not found' \
-        | awk '{print $1}' \
+        | awk '$2 == "=>" && $3 == "not" && $4 == "found" {print $1}' \
         | sort -u \
         || true
 }
