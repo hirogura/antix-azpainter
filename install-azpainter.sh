@@ -87,7 +87,10 @@ ensure_libjpeg8() {
 
 check_missing() {
     ldd /usr/local/bin/azpainter /usr/local/bin/mlk-style 2>/dev/null \
-        | grep 'not found' | awk '{print $1}' | sort -u
+        | grep 'not found' \
+        | awk '{print $1}' \
+        | sort -u \
+        || true
 }
 
 ensure_libjpeg8
