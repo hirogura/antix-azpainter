@@ -35,7 +35,7 @@ echo "対象: ${ARCH} / ダウンロード元: ${URL}"
 echo
 
 # --- ダウンロード ---
-echo "[1/4] パッケージをダウンロードしています..."
+echo "[1/5] パッケージをダウンロードしています..."
 if command -v wget >/dev/null 2>&1; then
     wget -q --show-progress -O "${TMP_DIR}/${ASSET}" "${URL}"
 elif command -v curl >/dev/null 2>&1; then
@@ -46,11 +46,11 @@ else
 fi
 
 # --- 展開 ---
-echo "[2/4] 展開しています..."
+echo "[2/5] 展開しています..."
 tar -xzf "${TMP_DIR}/${ASSET}" -C "${TMP_DIR}"
 
 # --- インストール ---
-echo "[3/4] /usr/local 配下にインストールしています..."
+echo "[3/5] /usr/local 配下にインストールしています..."
 if [ -d "${TMP_DIR}/usr/local" ]; then
     cp -a "${TMP_DIR}"/usr/local/. /usr/local/
 else
@@ -66,7 +66,7 @@ if [ -f "${TMP_DIR}/manifest" ]; then
 fi
 
 # --- 依存ライブラリの確認・修復 ---
-echo "[4/4] 依存ライブラリを確認しています..."
+echo "[4/5] 依存ライブラリを確認しています..."
 
 # 標準ライブラリディレクトリの判定
 MULTIARCH=""
@@ -168,10 +168,36 @@ fi
 
 ldconfig
 
+# --- デスクトップショートカットの作成 ---
+echo "[5/5] デスクトップにショートカットを作成しています..."
+
+create_desktop_shortcut() {
+    local user home_dir desktop_dir
+    user="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
+    home_dir="$(getent passwd "${user}" 2>/dev/null | cut -d: -f6)"
+    [ -n "${home_dir}" ] || home_dir="/home/${user}"
+    desktop_dir="${home_dir}/Desktop"
+
+    # antiX のデスクトップ（IceWM / ROX-Filer）は ~/Desktop を扱う
+    if [ -f /usr/local/share/applications/azpainter.desktop ]; then
+        mkdir -p "${desktop_dir}"
+        cp -f /usr/local/share/applications/azpainter.desktop "${desktop_dir}/azpainter.desktop"
+        chmod +x "${desktop_dir}/azpainter.desktop"
+        if id "${user}" >/dev/null 2>&1; then
+            chown "${user}:$(id -g "${user}")" "${desktop_dir}/azpainter.desktop"
+        fi
+        echo "デスクトップショートカットを作成しました: ${desktop_dir}/azpainter.desktop"
+    else
+        echo "警告: azpainter.desktop が無いためショートカットを作成できません。"
+    fi
+}
+
+create_desktop_shortcut
+
 echo
 echo "=== インストール完了 ==="
 if command -v azpainter >/dev/null 2>&1; then
-    echo "デスクトップメニューまたは 'azpainter' コマンドで起動できます。"
+    echo "デスクトップメニュー、デスクトップのショートカット、または 'azpainter' コマンドで起動できます。"
     echo "アンインストールする場合は uninstall-azpainter.sh を実行してください。"
 else
     echo "警告: インストールが正常に完了していない可能性があります。"

@@ -33,7 +33,9 @@ sudo ./install-azpainter.sh
 （`azpainter-linux-<arch>.tar.gz`、x86_64 / aarch64 対応）をダウンロードして展開します。
 不足している依存ライブラリがあれば自動で `apt` からインストールします。
 
-インストールが完了すると、デスクトップメニューまたは `azpainter` コマンドで起動できます。
+インストールが完了すると、実行したユーザーのデスクトップ（`~/Desktop/azpainter.desktop`）に
+ショートカットが作成されます。デスクトップメニュー、デスクトップのショートカット、
+または `azpainter` コマンドで起動できます。
 
 ## アンインストール
 
@@ -43,6 +45,7 @@ sudo ./uninstall-azpainter.sh
 
 インストール時に保存されたマニフェスト（`/var/lib/antix-azpainter/manifest`）に基づいて
 ファイルを削除します。マニフェストが無い場合は既知のインストール先を削除します。
+デスクトップに作成したショートカット（`~/Desktop/azpainter.desktop`）も自動で削除されます。
 
 > 注意: アプリの設定ファイル（`~/.config/azpainter3/` など）は残ります。
 

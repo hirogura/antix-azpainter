@@ -64,6 +64,14 @@ while IFS= read -r f; do
     fi
 done <<< "${FILES}"
 
+# --- デスクトップショートカットの削除 ---
+for f in /home/*/Desktop/azpainter.desktop /root/Desktop/azpainter.desktop; do
+    if [ -f "${f}" ] || [ -L "${f}" ]; then
+        rm -f -- "${f}" && COUNT=$((COUNT + 1))
+        echo "デスクトップショートカットを削除しました: ${f}"
+    fi
+done
+
 # --- ディレクトリの削除（中身が空になった場合のみ） ---
 while IFS= read -r f; do
     [ -z "${f}" ] && continue
